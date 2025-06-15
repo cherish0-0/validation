@@ -193,7 +193,7 @@ public class ValidationItemControllerV2 {
      * 상품 추가 처리 - 오류 메시지 외부화 (V3)
      * errors.properties 파일의 메시지 코드를 사용하여 오류 메시지 관리
      */
-    @PostMapping("/add")
+    // @PostMapping("/add")
     public String addItemV3(@ModelAttribute Item item, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
 
         /**
@@ -246,6 +246,71 @@ public class ValidationItemControllerV2 {
                  * ex) totalPriceMin=전체 가격은 {0}원 이상이어야 합니다. 현재 값 = {1}
                  */
                 bindingResult.addError(new ObjectError("item", new String[]{"totalPriceMin"}, new Object[]{10000, resultPrice}, null));
+            }
+        }
+
+        // 검증 실패 시 다시 입력 폼으로
+        //뷰에서 오류 메시지 표시 가능 (스프링이 model.addAttribute("BindingResult.item", bindingResult) 코드를 자동 수행)
+        if (bindingResult.hasErrors()) {
+            log.info("errors= {}", bindingResult);
+            return "validation/v2/addForm";
+        }
+
+        // 검증 성공 로직
+        Item savedItem = itemRepository.save(item);
+        redirectAttributes.addAttribute("itemId", savedItem.getId());
+        redirectAttributes.addAttribute("status", true);
+        return "redirect:/validation/v2/items/{itemId}";
+    }
+
+    /**
+     * 상품 추가 처리 - rejectValue(), reject() 메서드 사용 (V4)
+     * FieldError, ObjectError 직접 생성 대신 편리한 rejectValue, reject 메서드 사용
+     */
+    @PostMapping("/add")
+    public String addItemV4(@ModelAttribute Item item, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+
+        /**
+         * BindingResult는 검증 대상 바로 다음에 온다는 점에서 검증 대상을 알고 있음
+         * 따라서 target(item)에 대한 정보를 이미 갖고 있으므로 objectName을 생략할 수 있는
+         * rejectValue(), reject() 메서드를 제공함
+         */
+
+        // 검증 로직
+        if (!StringUtils.hasText(item.getItemName())) {
+            /**
+             * rejectValue() 메서드 파라미터:
+             * 1. field: 오류 필드명 ("itemName")
+             * 2. errorCode: 오류 코드 (메시지 프로퍼티의 코드) - "required"
+             * 3. errorArgs: 오류 메시지에서 사용할 인자 (옵션)
+             * 4. defaultMessage: 오류 메시지를 찾을 수 없을 때 사용할 기본 메시지 (옵션)
+             *
+             * 내부적으로 FieldError를 생성하고 rejectedValue, bindingFailure 등 처리
+             * 메시지 코드는 errorCode를 기반으로 다양한 메시지 코드를 생성하여 시도
+             * required.item.itemName, required.itemName, required.java.lang.String, required
+             */
+            bindingResult.rejectValue("itemName", "required");
+        }
+        if (item.getPrice() == null || item.getPrice() < 1000 || item.getPrice() > 1000000) {
+            bindingResult.rejectValue("price", "range", new Object[]{1000, 1000000}, null);
+        }
+        if (item.getQuantity() == null || item.getQuantity() > 9999) {
+            bindingResult.rejectValue("quantity", "max", new Object[]{9999}, null);
+        }
+
+        // 특정 필드가 아닌 복합 룰 검증
+        if (item.getPrice() != null && item.getQuantity() != null) {
+            int resultPrice = item.getPrice() * item.getQuantity();
+            if (resultPrice < 10000) {
+                /**
+                 * reject() 메서드 파라미터: (글로벌 오류에 사용)
+                 * 1. errorCode: 오류 코드 - "totalPriceMin"
+                 * 2. errorArgs: 오류 메시지에서 사용할 인자 - Object[]{10000, resultPrice}
+                 * 3. defaultMessage: 오류 메시지를 찾을 수 없을 때 사용할 기본 메시지
+                 *
+                 * ObjectError를 직접 생성하는 대신 사용할 수 있는 편리한 메서드
+                 */
+                bindingResult.reject("totalPriceMin", new Object[]{10000, resultPrice}, null);
             }
         }
 
