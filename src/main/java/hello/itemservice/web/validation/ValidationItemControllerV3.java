@@ -98,7 +98,28 @@ public class ValidationItemControllerV3 {
     }
 
     @PostMapping("/{itemId}/edit")
-    public String edit(@PathVariable Long itemId, @ModelAttribute Item item) {
+    public String edit(@PathVariable Long itemId, @Validated @ModelAttribute Item item , BindingResult bindingResult) {
+        // 특정 필드가 아닌 복합 룰 검증
+        if (item.getPrice() != null && item.getQuantity() != null) {
+            int resultPrice = item.getPrice() * item.getQuantity();
+            if (resultPrice < 10000) {
+                /**
+                 * reject() 메서드 파라미터: (글로벌 오류에 사용)
+                 * 1. errorCode: 오류 코드 - "totalPriceMin"
+                 * 2. errorArgs: 오류 메시지에서 사용할 인자 - Object[]{10000, resultPrice}
+                 * 3. defaultMessage: 오류 메시지를 찾을 수 없을 때 사용할 기본 메시지
+                 *
+                 * ObjectError를 직접 생성하는 대신 사용할 수 있는 편리한 메서드
+                 */
+                bindingResult.reject("totalPriceMin", new Object[]{10000, resultPrice}, null);
+            }
+        }
+
+        if (bindingResult.hasErrors()) {
+            log.info("errors= {}", bindingResult);
+            return "validation/v3/editForm";
+        }
+
         itemRepository.update(itemId, item);
         return "redirect:/validation/v3/items/{itemId}";
     }
