@@ -2,8 +2,6 @@ package hello.itemservice.web.validation;
 
 import hello.itemservice.domain.item.Item;
 import hello.itemservice.domain.item.ItemRepository;
-import hello.itemservice.domain.item.SaveCheck;
-import hello.itemservice.domain.item.UpdateCheck;
 import hello.itemservice.web.validation.form.ItemSaveForm;
 import hello.itemservice.web.validation.form.ItemUpdateForm;
 import lombok.RequiredArgsConstructor;
@@ -47,13 +45,15 @@ public class ValidationItemControllerV4 {
 
 
     /**
-     * 상품 추가 처리 - Bean Validation 사용 (기본 버전)
-     * 스프링 부트는 자동으로 글로벌 Validator로 Bean Validator를 등록함
+     * 상품 추가 처리 - 폼 객체 분리 버전
      *
-     * @Validated 어노테이션은 스프링 전용 검증 어노테이션으로 내부적으로 다음 과정을 수행:
-     * 1. Item 객체에 대해 Bean Validation을 실행
-     * 2. 검증 오류는 BindingResult에 담김
-     * 3. javax.validation 패키지의 @Valid 어노테이션도 동일한 기능 제공 (자바 표준)
+     * @param form 상품 저장을 위한 폼 객체. @ModelAttribute("item")을 사용해 뷰에서 접근할 이름을 "item"으로 지정
+     *
+     * 폼 객체(ItemSaveForm) 사용의 특징:
+     * 1. 폼 데이터를 전용 객체로 받아 검증 진행
+     * 2. 검증 통과 후 도메인 객체(Item)로 변환하여 비즈니스 로직 처리
+     * 3. 저장 시 필요한 필드만 포함하여 명확성 향상
+     * 4. 필요한 검증 어노테이션만 적용 가능(groups 속성 불필요)
      */
     @PostMapping("/add")
     public String addItem(@Validated @ModelAttribute("item") ItemSaveForm form, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
@@ -82,7 +82,9 @@ public class ValidationItemControllerV4 {
         }
 
         // 검증 성공 로직
-
+        /**
+         * 폼 객체에서 도메인 객체로 데이터 복사
+         */
         Item item = new Item();
         item.setItemName(form.getItemName());
         item.setPrice(form.getPrice());
@@ -105,8 +107,14 @@ public class ValidationItemControllerV4 {
     }
 
     /**
-     * 상품 수정 처리 - 기본 버전
-     * 모든 Bean Validation 규칙 적용
+     * 상품 수정 처리 - 폼 객체 분리 버전
+     *
+     * @param form 상품 수정을 위한 폼 객체. @ModelAttribute("item")을 사용해 뷰에서 접근할 이름을 "item"으로 지정
+     *
+     * 수정용 폼 객체(ItemUpdateForm) 사용의 특징:
+     * 1. ID를 필수 값으로 포함하여 수정 대상을 명확히 식별
+     * 2. 수정 시 필요한 필드와 검증 로직만 포함
+     * 3. 저장용 폼 객체와 명확히 구분되어 의도 파악이 용이
      */
     @PostMapping("/{itemId}/edit")
     public String edit(@PathVariable Long itemId, @Validated @ModelAttribute("item") ItemUpdateForm form , BindingResult bindingResult) {
@@ -131,6 +139,10 @@ public class ValidationItemControllerV4 {
             return "validation/v4/editForm";
         }
 
+        /**
+         * 폼 객체에서 도메인 객체로 데이터 복사
+         * 수정 처리 시에는 ID를 직접 설정하지 않고 파라미터로 받은 itemId 사용
+         */
         Item itemParam = new Item();
         itemParam.setItemName(form.getItemName());
         itemParam.setPrice(form.getPrice());
