@@ -24,6 +24,7 @@ import java.util.Map;
 public class ValidationItemControllerV2 {
 
     private final ItemRepository itemRepository;
+    private final ItemValidator itemValidator;
 
     @GetMapping
     public String items(Model model) {
@@ -267,7 +268,7 @@ public class ValidationItemControllerV2 {
      * 상품 추가 처리 - rejectValue(), reject() 메서드 사용 (V4)
      * FieldError, ObjectError 직접 생성 대신 편리한 rejectValue, reject 메서드 사용
      */
-    @PostMapping("/add")
+    // @PostMapping("/add")
     public String addItemV4(@ModelAttribute Item item, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
 
         /**
@@ -327,6 +328,28 @@ public class ValidationItemControllerV2 {
         redirectAttributes.addAttribute("status", true);
         return "redirect:/validation/v2/items/{itemId}";
     }
+
+
+
+    @PostMapping("/add")
+    public String addItemV5(@ModelAttribute Item item, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+
+        itemValidator.validate(item, bindingResult);
+
+        // 검증 실패 시 다시 입력 폼으로
+        //뷰에서 오류 메시지 표시 가능 (스프링이 model.addAttribute("BindingResult.item", bindingResult) 코드를 자동 수행)
+        if (bindingResult.hasErrors()) {
+            log.info("errors= {}", bindingResult);
+            return "validation/v2/addForm";
+        }
+
+        // 검증 성공 로직
+        Item savedItem = itemRepository.save(item);
+        redirectAttributes.addAttribute("itemId", savedItem.getId());
+        redirectAttributes.addAttribute("status", true);
+        return "redirect:/validation/v2/items/{itemId}";
+    }
+
 
 
 
