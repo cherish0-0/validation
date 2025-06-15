@@ -56,6 +56,23 @@ public class ValidationItemControllerV3 {
     @PostMapping("/add")
     public String addItem(@Validated @ModelAttribute Item item, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
 
+        // 특정 필드가 아닌 복합 룰 검증
+        if (item.getPrice() != null && item.getQuantity() != null) {
+            int resultPrice = item.getPrice() * item.getQuantity();
+            if (resultPrice < 10000) {
+                /**
+                 * reject() 메서드 파라미터: (글로벌 오류에 사용)
+                 * 1. errorCode: 오류 코드 - "totalPriceMin"
+                 * 2. errorArgs: 오류 메시지에서 사용할 인자 - Object[]{10000, resultPrice}
+                 * 3. defaultMessage: 오류 메시지를 찾을 수 없을 때 사용할 기본 메시지
+                 *
+                 * ObjectError를 직접 생성하는 대신 사용할 수 있는 편리한 메서드
+                 */
+                bindingResult.reject("totalPriceMin", new Object[]{10000, resultPrice}, null);
+            }
+        }
+
+
         // 검증 실패 시 다시 입력 폼으로
         //뷰에서 오류 메시지 표시 가능 (스프링이 model.addAttribute("BindingResult.item", bindingResult) 코드를 자동 수행)
         if (bindingResult.hasErrors()) {
