@@ -10,6 +10,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -25,6 +27,16 @@ public class ValidationItemControllerV2 {
 
     private final ItemRepository itemRepository;
     private final ItemValidator itemValidator;
+
+    /**
+     * 컨트롤러에서 검증기(Validator) 등록
+     * WebDataBinder는 요청 데이터를 객체에 바인딩하는 역할을 담당
+     * 이 메서드에서 등록한 검증기는 해당 컨트롤러 내에서 @Validated 어노테이션이 붙은 객체에 대해 자동으로 검증을 수행함
+     */
+    @InitBinder
+    public void init(WebDataBinder dataBinder) {
+        dataBinder.addValidators(itemValidator);
+    }
 
     @GetMapping
     public String items(Model model) {
@@ -329,12 +341,53 @@ public class ValidationItemControllerV2 {
         return "redirect:/validation/v2/items/{itemId}";
     }
 
-
-
-    @PostMapping("/add")
+    /**
+     * 상품 추가 처리 - ItemValidator 사용 (V5)
+     * 별도로 분리한 검증 클래스(ItemValidator)를 사용하여 검증 로직 처리
+     */
+    // @PostMapping("/add")
     public String addItemV5(@ModelAttribute Item item, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
 
+        /**
+         * ItemValidator를 직접 호출하여 검증 로직 실행
+         * validate(Object target, Errors errors) 메서드 호출
+         * - item: 검증 대상 객체
+         * - bindingResult: 검증 오류를 담을 객체(Errors의 하위 인터페이스)
+         *
+         * 별도의 검증 클래스를 사용하면 다음과 같은 장점이 있음:
+         * 1. 검증 로직 재사용 가능
+         * 2. 관심사 분리(검증 로직과 컨트롤러 로직 분리)
+         * 3. 코드 가독성 향상
+         */
         itemValidator.validate(item, bindingResult);
+
+        // 검증 실패 시 다시 입력 폼으로
+        //뷰에서 오류 메시지 표시 가능 (스프링이 model.addAttribute("BindingResult.item", bindingResult) 코드를 자동 수행)
+        if (bindingResult.hasErrors()) {
+            log.info("errors= {}", bindingResult);
+            return "validation/v2/addForm";
+        }
+
+        // 검증 성공 로직
+        Item savedItem = itemRepository.save(item);
+        redirectAttributes.addAttribute("itemId", savedItem.getId());
+        redirectAttributes.addAttribute("status", true);
+        return "redirect:/validation/v2/items/{itemId}";
+    }
+
+    /**
+     * 상품 추가 처리 - @Validated 어노테이션 사용 (V6)
+     * 스프링 프레임워크에서 제공하는 @Validated를 사용하여 검증 자동화
+     *
+     * @param item : @Validated 어노테이션이 붙은 객체는 앞서 등록한 검증기가 자동으로 적용됨
+     *
+     * @Validated 어노테이션 작동 원리:
+     * 1. @InitBinder에 등록한 검증기 중 item 객체를 지원하는 검증기를 찾음(ItemValidator의 supports() 메서드 호출)
+     * 2. 해당 검증기의 validate() 메서드를 자동으로 호출하여 검증 수행
+     * 3. 검증 결과는 bindingResult에 담김
+     */
+    @PostMapping("/add")
+    public String addItemV6(@Validated @ModelAttribute Item item, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
 
         // 검증 실패 시 다시 입력 폼으로
         //뷰에서 오류 메시지 표시 가능 (스프링이 model.addAttribute("BindingResult.item", bindingResult) 코드를 자동 수행)
