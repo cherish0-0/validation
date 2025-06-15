@@ -45,6 +45,7 @@ public class ValidationItemControllerV2 {
         return "validation/v2/addForm";
     }
 
+
     /**
      * 상품 추가 처리 - BindingResult를 이용한 검증
      *
@@ -54,7 +55,7 @@ public class ValidationItemControllerV2 {
      * @param bindingResult : 데이터 바인딩 및 검증 오류 정보를 보관하는 객체
      * @param redirectAttributes : 리다이렉트 시 사용할 속성 값 설정
      */
-    @PostMapping("/add")
+    // @PostMapping("/add")
     public String addItemV1(@ModelAttribute Item item, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
 
         /**
@@ -114,6 +115,78 @@ public class ValidationItemControllerV2 {
         redirectAttributes.addAttribute("status", true);
         return "redirect:/validation/v2/items/{itemId}";
     }
+
+    @PostMapping("/add")
+    public String addItemV2(@ModelAttribute Item item, BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+
+        /**
+         * BindingResult는 스프링이 제공하는 검증 오류를 보관하는 객체로 다음과 같은 특징이 있다:
+         * 1. 반드시 @ModelAttribute 바로 다음 파라미터로 선언해야 함 (순서 중요)
+         * 2. 검증할 대상 객체(item)의 바인딩 결과를 담고 있음
+         * 3. 필드 단위 오류와 객체 단위 오류를 모두 저장할 수 있음
+         * 4. 뷰에 자동으로 오류 정보가 넘어가 타임리프 등에서 활용 가능 (model 객체 자동 생성)
+         * 5. 바인딩 실패 시에도 컨트롤러가 호출됨 (검증 로직 실행 가능)
+         */
+
+        // 검증 로직
+        if (!StringUtils.hasText(item.getItemName())) {
+            /**
+             * FieldError 생성자 파라미터 (V2 개선 버전):
+             * 1. objectName: 오류가 발생한 객체명 ("item")
+             * 2. field: 오류 필드명 ("itemName")
+             * 3. rejectedValue: 사용자가 입력한 값(거절된 값) - item.getItemName()
+             * 4. bindingFailure: 타입 오류 같은 바인딩 실패인지 여부 (여기선 false)
+             * 5. codes: 메시지 코드 (null 사용)
+             * 6. arguments: 메시지에서 사용하는 인자 (null 사용)
+             * 7. defaultMessage: 기본 오류 메시지
+             *
+             * 사용자가 입력한 값(rejectedValue)을 보관하고 있어 오류 발생 시에도 입력 폼에 이전 값을 유지할 수 있음
+             * 타입 오류로 바인딩 실패 시 스프링은 FieldError를 생성하며 사용자 입력값을 넣어둠 -> 오류를 BingingResult에 담아 컨트롤러를 호출
+             *  => 바인딩 실패 시에도 오류 메시지 정상 출력
+             */
+            bindingResult.addError(new FieldError("item", "itemName", item.getItemName(), false, null, null, "상품 이름은 필수입니다."));
+        }
+        if (item.getPrice() == null || item.getPrice() < 1000 || item.getPrice() > 1000000) {
+            bindingResult.addError(new FieldError("item", "price", item.getPrice(), false, null, null, "가격은 1,000 ~ 1,000,000 사이여야 합니다."));
+        }
+        if (item.getQuantity() == null || item.getQuantity() > 9999) {
+            bindingResult.addError(new FieldError("item", "quantity", item.getQuantity(), false, null, null, "수량은 최대 9,999 까지 허용합니다."));
+
+
+        }
+
+        // 특정 필드가 아닌 복합 룰 검증
+        if (item.getPrice() != null && item.getQuantity() != null) {
+            int resultPrice = item.getPrice() * item.getQuantity();
+            if (resultPrice < 10000) {
+                /**
+                 * ObjectError 생성자 파라미터 (V2 개선 버전):
+                 * 1. objectName: 오류가 발생한 객체명 ("item")
+                 * 2. codes: 메시지 코드 (null 사용)
+                 * 3. arguments: 메시지에서 사용하는 인자 (null 사용)
+                 * 4. defaultMessage: 기본 오류 메시지
+                 *
+                 * FieldError와 마찬가지로 메시지 코드와 인자를 지원함
+                 */
+                bindingResult.addError(new ObjectError("item", null, null, "가격 * 수량의 합은 10,000원 이상이어야 합니다. 현재 값 = " + resultPrice));
+            }
+        }
+
+        // 검증 실패 시 다시 입력 폼으로
+        //뷰에서 오류 메시지 표시 가능 (스프링이 model.addAttribute("BindingResult.item", bindingResult) 코드를 자동 수행)
+        if (bindingResult.hasErrors()) {
+            log.info("errors= {}", bindingResult);
+            return "validation/v2/addForm";
+        }
+
+        // 검증 성공 로직
+        Item savedItem = itemRepository.save(item);
+        redirectAttributes.addAttribute("itemId", savedItem.getId());
+        redirectAttributes.addAttribute("status", true);
+        return "redirect:/validation/v2/items/{itemId}";
+    }
+
+
 
     @GetMapping("/{itemId}/edit")
     public String editForm(@PathVariable Long itemId, Model model) {
