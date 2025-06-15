@@ -8,6 +8,9 @@ import org.springframework.validation.Validator;
 
 @Component
 public class ItemValidator implements Validator {
+
+    // 검증기가 여러 개일 경우 supports() 메서드가 구분해줌
+    // (여기서는 파라미터에 Item.class가 들어옴 -> 결과는 true -> validate() 호출)
     @Override
     public boolean supports(Class<?> clazz) {
         return Item.class.isAssignableFrom(clazz);
